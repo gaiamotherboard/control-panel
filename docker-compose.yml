@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   db:
@@ -11,8 +11,12 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # WARNING: Only expose port in development. Remove in production!
     ports:
       - "5432:5432"
+    profiles:
+      - dev
+      - ""
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB}"]
       interval: 5s
@@ -28,6 +32,7 @@ services:
     command: >
       sh -c "python manage.py migrate &&
              python manage.py create_superuser_if_none &&
+             python manage.py collectstatic --noinput &&
              python manage.py runserver 0.0.0.0:8000"
     environment:
       DATABASE_URL: ${DATABASE_URL}
@@ -47,6 +52,9 @@ services:
         condition: service_healthy
     networks:
       - backend
+    profiles:
+      - dev
+      - ""
 
   pgadmin:
     image: dpage/pgadmin4
@@ -63,6 +71,35 @@ services:
       - db
     networks:
       - backend
+    profiles:
+      - dev
+      - ""
+
+  # Production-ready web service with Gunicorn
+  web-prod:
+    build: .
+    container_name: django_web_prod
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py collectstatic --noinput &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: "False"
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
+      MAX_LSHW_BYTES: ${MAX_LSHW_BYTES}
+    volumes:
+      - ./staticfiles:/app/staticfiles
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+    profiles:
+      - production
 
 networks:
   backend:

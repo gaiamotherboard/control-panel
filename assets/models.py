@@ -149,12 +149,13 @@ class Drive(models.Model):
         """Human-readable capacity (e.g., 256 GB)"""
         if not self.capacity_bytes:
             return None
-        # Simple formatter
+        # Simple formatter - use local variable to avoid mutation bug
+        bytes_remaining = float(self.capacity_bytes)
         for unit in ["B", "KB", "MB", "GB", "TB"]:
-            if self.capacity_bytes < 1024.0:
-                return f"{self.capacity_bytes:.1f} {unit}"
-            self.capacity_bytes /= 1024.0
-        return f"{self.capacity_bytes:.1f} PB"
+            if bytes_remaining < 1024.0:
+                return f"{bytes_remaining:.1f} {unit}"
+            bytes_remaining /= 1024.0
+        return f"{bytes_remaining:.1f} PB"
 
     @property
     def serial_tag(self):

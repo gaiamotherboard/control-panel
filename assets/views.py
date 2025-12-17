@@ -66,8 +66,9 @@ def asset_detail(request, asset_tag):
         defaults={"created_by": request.user},
     )
 
-    # Log the view (audit trail)
-    _log_touch(asset, "view", request.user, {"asset_tag": asset_tag})
+    # REMOVED: View logging causes massive DB bloat from page refreshes
+    # Only log meaningful state changes (intake updates, scans, drive status)
+    # _log_touch(asset, "view", request.user, {"asset_tag": asset_tag})
 
     # Get latest hardware scan
     latest_scan = (
@@ -192,9 +193,14 @@ def asset_scan_upload(request, asset_tag):
 
         # Create/update drive records
         for disk in disks:
+            serial = disk.get("serial")
+            # Skip drives with missing/empty serials to prevent duplicates
+            if not serial or not serial.strip():
+                continue
+
             Drive.objects.update_or_create(
                 asset=asset,
-                serial=disk.get("serial"),
+                serial=serial,
                 defaults={
                     "logicalname": disk.get("logicalname", ""),
                     "capacity_bytes": disk.get("size_bytes"),
