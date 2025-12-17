@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asset {{ asset.asset_tag }} - Asset Control Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .wrap-anywhere { overflow-wrap: anywhere; word-break: break-word; }
+        @media print { .no-print { display: none; } body { background: white; } }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b border-slate-200 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="{% url 'home' %}" class="text-blue-600 hover:text-blue-700 mr-4">
+                        <i class="fas fa-arrow-left mr-2"></i>Back
+                    </a>
+                    <h1 class="text-xl font-bold text-slate-800">
+                        <i class="fas fa-box text-blue-600 mr-2"></i>
+                        Asset Control Panel
+                    </h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-slate-600">{{ request.user.username }}</span>
+                    <a href="{% url 'logout' %}" class="text-sm text-red-600 hover:text-red-700">Logout</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- Messages -->
+        {% if messages %}
+        <div class="mb-6 space-y-2">
+            {% for message in messages %}
+            <div class="{% if message.tags == 'success' %}bg-green-50 border-green-200 text-green-700{% elif message.tags == 'error' %}bg-red-50 border-red-200 text-red-700{% else %}bg-blue-50 border-blue-200 text-blue-700{% endif %} border px-4 py-3 rounded-lg">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Header Card -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+            <div class="border-t-4 border-indigo-600 px-6 py-6 text-center">
+                <h1 class="text-4xl font-extrabold tracking-tight text-slate-900">
+                    Asset <span class="text-indigo-700">{{ asset.asset_tag }}</span>
+                </h1>
+                <div class="mt-2 text-sm text-slate-500">
+                    Created {{ asset.created_at|date:"Y-m-d H:i" }} by {{ asset.created_by.username }}
+                </div>
+
+                {% if latest_scan %}
+                <!-- Hardware Identity Cards -->
+                <div class="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-left">
+                    <!-- CPU -->
+                    <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div class="flex items-center gap-2 text-xs font-bold tracking-wide text-slate-600 uppercase mb-2">
+                            <i class="fas fa-microchip text-slate-500"></i>
+                            <span>CPU</span>
+                        </div>
+                        <div class="text-sm font-semibold text-slate-900 wrap-anywhere">
+                            {{ cpu_info|default:"Not detected" }}
+                        </div>
+                    </div>
+
+                    <!-- RAM -->
+                    <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div class="flex items-center gap-2 text-xs font-bold tracking-wide text-slate-600 uppercase mb-2">
+                            <i class="fas fa-memory text-slate-500"></i>
+                            <span>RAM</span>
+                        </div>
+                        <div class="text-sm font-semibold text-slate-900">
+                            {{ hw_summary.ram|default:"Not detected" }}
+                        </div>
+                    </div>
+
+                    <!-- Storage -->
+                    <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div class="flex items-center gap-2 text-xs font-bold tracking-wide text-slate-600 uppercase mb-2">
+                            <i class="fas fa-hard-drive text-slate-500"></i>
+                            <span>Storage</span>
+                        </div>
+                        <div class="text-sm font-semibold text-slate-900 wrap-anywhere">
+                            {{ hw_summary.storage|default:"Not detected" }}
+                        </div>
+                    </div>
+
+                    <!-- Serial -->
+                    <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div class="flex items-center gap-2 text-xs font-bold tracking-wide text-slate-600 uppercase mb-2">
+                            <i class="fas fa-hashtag text-slate-500"></i>
+                            <span>Device Serial</span>
+                        </div>
+                        <div class="text-sm font-semibold text-slate-900 wrap-anywhere">
+                            {{ latest_scan.device_serial|default:"Not detected" }}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Two Column Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- Left Column -->
+            <div class="space-y-6">
+
+                <!-- Intake Information Card -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="border-b border-slate-200 px-6 py-4 bg-slate-50">
+                        <h2 class="text-lg font-semibold text-slate-800">
+                            <i class="fas fa-clipboard-check text-blue-600 mr-2"></i>
+                            Intake Information
+                        </h2>
+                    </div>
+                    <div class="p-6">
+                        <form method="post" action="{% url 'asset_intake_update' asset.asset_tag %}">
+                            {% csrf_token %}
+                            <div class="space-y-4">
+                                <!-- Status -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                                    {{ intake_form.status }}
+                                </div>
+
+                                <!-- Device Type -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Device Type</label>
+                                    {{ intake_form.device_type }}
+                                </div>
+
+                                <!-- Cosmetic Grade -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Cosmetic Grade</label>
+                                    {{ intake_form.cosmetic_grade }}
+                                </div>
+
+                                <!-- Cosmetic Notes -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Cosmetic Notes</label>
+                                    {{ intake_form.cosmetic_notes }}
+                                </div>
+
+                                <!-- Location -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Location</label>
+                                    {{ intake_form.location }}
+                                </div>
+
+                                <!-- Submit Button -->
+                                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition">
+                                    <i class="fas fa-save mr-2"></i>
+                                    Save Intake Information
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Upload Hardware Scan Card -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="border-b border-slate-200 px-6 py-4 bg-slate-50">
+                        <h2 class="text-lg font-semibold text-slate-800">
+                            <i class="fas fa-upload text-green-600 mr-2"></i>
+                            Upload Hardware Scan
+                        </h2>
+                    </div>
+                    <div class="p-6">
+                        <form method="post" action="{% url 'asset_scan_upload' asset.asset_tag %}" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <div class="space-y-4">
+                                <!-- File Upload -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">LSHW JSON File</label>
+                                    {{ upload_form.file }}
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        <i class="fas fa-info-circle mr-1"></i>
+                                        Upload output from: <code class="bg-slate-100 px-1 rounded">lshw -json</code>
+                                    </p>
+                                </div>
+
+                                <!-- User Notes -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Notes (Optional)</label>
+                                    {{ upload_form.user_notes }}
+                                </div>
+
+                                <!-- Submit Button -->
+                                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition">
+                                    <i class="fas fa-cloud-upload-alt mr-2"></i>
+                                    Upload Hardware Scan
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Column -->
+            <div class="space-y-6">
+
+                <!-- Drives Card -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="border-b border-slate-200 px-6 py-4 bg-slate-50">
+                        <h2 class="text-lg font-semibold text-slate-800">
+                            <i class="fas fa-hard-drive text-purple-600 mr-2"></i>
+                            Storage Drives ({{ drives.count }})
+                        </h2>
+                    </div>
+                    <div class="p-6">
+                        {% if drives %}
+                        <div class="space-y-4">
+                            {% for drive in drives %}
+                            <div class="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                                <div class="flex items-start justify-between mb-2">
+                                    <div class="flex-1">
+                                        <div class="font-semibold text-slate-900">
+                                            {{ drive.model|default:"Unknown Model" }}
+                                        </div>
+                                        <div class="text-sm text-slate-600 mt-1">
+                                            {% if drive.capacity_human %}
+                                                <i class="fas fa-database mr-1"></i>{{ drive.capacity_human }}
+                                            {% endif %}
+                                            {% if drive.logicalname %}
+                                                <span class="ml-2"><i class="fas fa-folder mr-1"></i>{{ drive.logicalname }}</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="text-xs text-slate-500 mt-1">
+                                            {% if drive.serial %}
+                                                {% if drive.serial|slice:":9" == "NOSERIAL-" %}
+                                                    <i class="fas fa-exclamation-triangle mr-1"></i>(No serial number)
+                                                {% else %}
+                                                    <i class="fas fa-barcode mr-1"></i>SN: {{ drive.serial }}
+                                                {% endif %}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        {% if drive.status == 'present' %}
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                Present
+                                            </span>
+                                        {% elif drive.status == 'wiped' %}
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                Wiped
+                                            </span>
+                                        {% elif drive.status == 'shredded' %}
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                Shredded
+                                            </span>
+                                        {% elif drive.status == 'removed' %}
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                Removed
+                                            </span>
+                                        {% else %}
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
+                                                {{ drive.get_status_display }}
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <!-- Drive Status Update Form -->
+                                <details class="mt-3">
+                                    <summary class="cursor-pointer text-sm text-blue-600 hover:text-blue-700">
+                                        <i class="fas fa-edit mr-1"></i>Update Status
+                                    </summary>
+                                    <form method="post" action="{% url 'drive_status_update' asset.asset_tag drive.id %}" class="mt-3 space-y-3">
+                                        {% csrf_token %}
+                                        <div>
+                                            <label class="block text-xs font-medium text-slate-700 mb-1">Status</label>
+                                            <select name="status" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                                <option value="present" {% if drive.status == 'present' %}selected{% endif %}>Present</option>
+                                                <option value="removed" {% if drive.status == 'removed' %}selected{% endif %}>Removed</option>
+                                                <option value="wiped" {% if drive.status == 'wiped' %}selected{% endif %}>Wiped</option>
+                                                <option value="shredded" {% if drive.status == 'shredded' %}selected{% endif %}>Shredded</option>
+                                                <option value="returned_to_client" {% if drive.status == 'returned_to_client' %}selected{% endif %}>Returned to Client</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-slate-700 mb-1">Note (Optional)</label>
+                                            <textarea name="status_note" rows="2" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Optional notes...">{{ drive.status_note }}</textarea>
+                                        </div>
+                                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-3 rounded-lg transition">
+                                            Update Drive Status
+                                        </button>
+                                    </form>
+                                </details>
+
+                                {% if drive.status_note %}
+                                <div class="mt-2 text-xs text-slate-600 bg-white border border-slate-200 rounded p-2">
+                                    <i class="fas fa-comment mr-1"></i>{{ drive.status_note }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-center py-8 text-slate-500">
+                            <i class="fas fa-hard-drive text-4xl mb-3 text-slate-300"></i>
+                            <p>No drives detected yet</p>
+                            <p class="text-sm mt-1">Upload a hardware scan to detect drives</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Audit Trail Card -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="border-b border-slate-200 px-6 py-4 bg-slate-50">
+                        <h2 class="text-lg font-semibold text-slate-800">
+                            <i class="fas fa-history text-orange-600 mr-2"></i>
+                            Audit Trail ({{ touches.count }})
+                        </h2>
+                    </div>
+                    <div class="p-6 max-h-96 overflow-y-auto">
+                        {% if touches %}
+                        <div class="space-y-3">
+                            {% for touch in touches %}
+                            <div class="text-sm border-l-2 {% if touch.touch_type == 'scan_upload' %}border-green-500{% elif touch.touch_type == 'intake_update' %}border-blue-500{% elif touch.touch_type == 'drive_status' %}border-purple-500{% else %}border-slate-300{% endif %} pl-3 py-1">
+                                <div class="font-medium text-slate-900">
+                                    {{ touch.get_touch_type_display }}
+                                </div>
+                                <div class="text-xs text-slate-500">
+                                    {{ touch.touched_at|date:"Y-m-d H:i:s" }} by {{ touch.touched_by.username }}
+                                </div>
+                                {% if touch.details %}
+                                <div class="text-xs text-slate-600 mt-1">
+                                    {% if touch.details.scan_id %}
+                                        Scan ID: {{ touch.details.scan_id }}
+                                    {% endif %}
+                                    {% if touch.details.drive_count %}
+                                        | {{ touch.details.drive_count }} drive(s)
+                                    {% endif %}
+                                    {% if touch.details.status %}
+                                        Status: {{ touch.details.status }}
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-center py-4 text-slate-500 text-sm">
+                            <i class="fas fa-clock text-2xl mb-2 text-slate-300"></i>
+                            <p>No activity yet</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <style>
+        .form-control {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        select.form-control {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+        }
+    </style>
+</body>
+</html>

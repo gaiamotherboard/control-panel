@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Asset Control Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-slate-100 to-slate-200 min-h-screen flex items-center justify-center">
+    <div class="max-w-md w-full mx-4">
+        <!-- Login Card -->
+        <div class="bg-white rounded-2xl shadow-xl p-8">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-slate-800 mb-2">Asset Control Panel</h1>
+                <p class="text-slate-600">Sign in to continue</p>
+            </div>
+
+            <!-- Login Form -->
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+
+                {% if form.errors %}
+                <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                    <p class="font-medium">Invalid credentials</p>
+                    <p class="text-sm">Please check your username and password.</p>
+                </div>
+                {% endif %}
+
+                <!-- Username -->
+                <div>
+                    <label for="id_username" class="block text-sm font-medium text-slate-700 mb-2">
+                        Username
+                    </label>
+                    <input
+                        type="text"
+                        name="username"
+                        id="id_username"
+                        required
+                        autofocus
+                        class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                        placeholder="Enter your username"
+                    >
+                </div>
+
+                <!-- Password -->
+                <div>
+                    <label for="id_password" class="block text-sm font-medium text-slate-700 mb-2">
+                        Password
+                    </label>
+                    <input
+                        type="password"
+                        name="password"
+                        id="id_password"
+                        required
+                        class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                        placeholder="Enter your password"
+                    >
+                </div>
+
+                <!-- Submit Button -->
+                <button
+                    type="submit"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 shadow-md hover:shadow-lg"
+                >
+                    Sign In
+                </button>
+
+                <!-- Hidden redirect field -->
+                <input type="hidden" name="next" value="{{ next }}">
+            </form>
+
+            <!-- Footer Note -->
+            <div class="mt-6 text-center text-sm text-slate-500">
+                <p>Default credentials: admin / admin123</p>
+                <p class="mt-1">(Change these in production!)</p>
+            </div>
+        </div>
+
+        <!-- Version Info -->
+        <div class="text-center mt-4 text-slate-600 text-sm">
+            <p>Asset Tracking System v2.0 (Django)</p>
+        </div>
+    </div>
+</body>
+</html>
