@@ -11,12 +11,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    # WARNING: Only expose port in development. Remove in production!
+    # NOTE: In development this is exposed for convenience. Remove or restrict in production.
     ports:
       - "5432:5432"
-    profiles:
-      - dev
-      - ""
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB}"]
       interval: 5s
@@ -25,6 +22,7 @@ services:
     networks:
       - backend
 
+  # Development web service (runserver)
   web:
     build: .
     container_name: django_web
@@ -35,7 +33,17 @@ services:
              python manage.py collectstatic --noinput &&
              python manage.py runserver 0.0.0.0:8000"
     environment:
+      # Database connection (explicit vars used by Django settings)
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: db
+      DB_PORT: ${DB_PORT:-5432}
+
+      # Also provide DATABASE_URL for tools/compatibility
       DATABASE_URL: ${DATABASE_URL}
+
+      # Django settings
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
       DJANGO_DEBUG: ${DJANGO_DEBUG}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
@@ -54,8 +62,8 @@ services:
       - backend
     profiles:
       - dev
-      - ""
 
+  # Optional pgAdmin for development only
   pgadmin:
     image: dpage/pgadmin4
     container_name: asset_pgadmin
@@ -73,9 +81,8 @@ services:
       - backend
     profiles:
       - dev
-      - ""
 
-  # Production-ready web service with Gunicorn
+  # Production-ready web service (Gunicorn)
   web-prod:
     build: .
     container_name: django_web_prod
@@ -84,13 +91,24 @@ services:
       sh -c "python manage.py collectstatic --noinput &&
              gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120"
     environment:
+      # Use the same explicit DB vars to ensure consistency
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: db
+      DB_PORT: ${DB_PORT:-5432}
+
+      # Provide DATABASE_URL as well if you prefer using it
       DATABASE_URL: ${DATABASE_URL}
+
+      # Force safe production Django settings
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
       DJANGO_DEBUG: "False"
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
       MAX_LSHW_BYTES: ${MAX_LSHW_BYTES}
     volumes:
       - ./staticfiles:/app/staticfiles
+    # In production you may choose not to expose DB port; web-prod only needs to expose app port
     ports:
       - "8000:8000"
     depends_on:

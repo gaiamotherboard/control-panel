@@ -20,7 +20,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
 from .forms import AssetIntakeForm, DriveStatusForm, HardwareScanUploadForm
-from .lshw_parser import extract_serial, parse_disks, parse_lshw_json
+from .lshw_parser import extract_serial, format_bytes, parse_disks, parse_lshw_json
 from .models import Asset, AssetTouch, Drive, HardwareScan
 
 
@@ -80,17 +80,67 @@ def asset_detail(request, asset_tag):
     # Extract hardware info from latest scan
     cpu_info = None
     hw_summary = None
+    # Additional parsed fields we'll expose to the template
+    system_info = None
+    graphics = []
+    network = []
+    multimedia = {}
+    battery = None
+    # Memory defaults to avoid UnboundLocalError when no scan or no parsed memory
+    memory_slots = []
+    memory_total_bytes = None
+    memory_total_human = None
     if latest_scan:
         if latest_scan.summary:
             hw_summary = latest_scan.summary
         if latest_scan.raw_json:
             parsed = parse_lshw_json(latest_scan.raw_json)
             cpu_info = parsed.get("cpu_info")
+            # populate additional parsed fields (use sensible defaults)
+            system_info = parsed.get("system_info")
+            graphics = parsed.get("graphics", []) or []
+            network = parsed.get("network", []) or []
+            multimedia = parsed.get("multimedia", {}) or {}
+            battery = parsed.get("battery")
+
+            # --- Memory parsing: expose per-slot info and a total (bytes & human) ---
+            # The parser returns memory_slots (list of dicts) and memory_total_bytes (int)
+            memory_slots = parsed.get("memory_slots", []) or []
+            memory_total_bytes = parsed.get("memory_total_bytes")
+            # Create a human-readable total, e.g. "16.0 GB"
+            memory_total_human = None
+            if memory_total_bytes:
+                try:
+                    gb = float(memory_total_bytes) / (1024**3)
+                    # show integer GB if whole number, otherwise one decimal
+                    if abs(gb - round(gb)) < 0.01:
+                        memory_total_human = f"{int(round(gb))} GB"
+                    else:
+                        memory_total_human = f"{gb:.1f} GB"
+                except Exception:
+                    memory_total_human = None
+
             if not hw_summary:
                 hw_summary = parsed.get("hw_summary")
 
     # Get drives
     drives = asset.drives.all()
+
+    # Filter out ephemeral / runtime block devices that come from the live media
+    # (examples: mmcblk*, loop*, sr*). We keep the full `drives` queryset for
+    # storage but expose `display_drives` to the template for the user-facing list.
+    def _is_ephemeral(drive):
+        ln = (drive.logicalname or "").lower()
+        # Canonicalize common /dev/ names
+        if ln.startswith("/dev/"):
+            ln = ln[5:]
+        # Exclude mmc (mmcblk*), loop devices, and optical (sr*)
+        return ln.startswith("mmc") or ln.startswith("loop") or ln.startswith("sr")
+
+    display_drives = [d for d in drives if not _is_ephemeral(d)]
+
+    # Flag that a first-class hard drive is present (used by the UI to show a warning)
+    hard_drive_present = bool(display_drives)
 
     # Get audit trail (touches)
     touches = asset.touches.select_related("touched_by").order_by("-touched_at")[:50]
@@ -104,7 +154,19 @@ def asset_detail(request, asset_tag):
         "latest_scan": latest_scan,
         "cpu_info": cpu_info,
         "hw_summary": hw_summary,
+        # New hardware fields exposed to the template
+        "system_info": system_info,
+        "graphics": graphics,
+        "network": network,
+        "multimedia": multimedia,
+        "battery": battery,
         "drives": drives,
+        "display_drives": display_drives,
+        "hard_drive_present": hard_drive_present,
+        # Memory fields (per-slot and totals) for template display
+        "memory_slots": memory_slots,
+        "memory_total_bytes": memory_total_bytes,
+        "memory_total_human": memory_total_human,
         "touches": touches,
         "intake_form": intake_form,
         "upload_form": upload_form,
