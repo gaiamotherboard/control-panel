@@ -55,3 +55,6 @@ db.sqlite3-journal
 # Migrations (uncomment if you want to ignore them)
 # */migrations/*.py
 # !*/migrations/__init__.py
+*.env
+.env.*
+!.env.example

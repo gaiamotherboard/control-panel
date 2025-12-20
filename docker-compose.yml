@@ -5,6 +5,8 @@ services:
     image: postgres:16
     container_name: asset_db
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -29,6 +31,8 @@ services:
     build: .
     container_name: django_web
     restart: unless-stopped
+    env_file:
+      - .env
     command: >
       sh -c "python manage.py migrate &&
              python manage.py create_superuser_if_none &&
@@ -60,6 +64,8 @@ services:
     image: dpage/pgadmin4
     container_name: asset_pgadmin
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
