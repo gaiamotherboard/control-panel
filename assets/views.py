@@ -218,60 +218,131 @@ def asset_intake_update(request, asset_tag):
 @require_http_methods(["POST"])
 def asset_scan_upload(request, asset_tag):
     """
-    Upload hardware scan (lshw JSON file)
-    Replaces /asset/{asset_tag}/upload_form from FastAPI
+    Upload scan bundle JSON (motherboard.scan_bundle.v1).
 
-    Process:
-    1. Validate uploaded file
-    2. Parse lshw JSON
-    3. Extract device serial, CPU, RAM, drives
-    4. Create HardwareScan record
-    5. Update/create Drive records
-    6. Log the upload
+    Replaces the old lshw-only upload flow. This view:
+    - validates and accepts only the new scan bundle (form enforces schema)
+    - requires that bundle.intake.asset_id matches the URL asset_tag
+    - computes a canonical sha256 bundle hash and deduplicates
+    - stores the raw bundle and bundle metadata on HardwareScan
+    - calls the existing lshw parsing logic using bundle['sources']['lshw']
+      so existing drive extraction and summary behavior remains unchanged
+    - updates/creates Drive records from parsed lshw disks
+    - logs the upload via AssetTouch
     """
+    import hashlib
+
+    from django.utils.dateparse import parse_datetime
+
     asset = get_object_or_404(Asset, asset_tag=asset_tag)
     form = HardwareScanUploadForm(request.POST, request.FILES)
 
     if form.is_valid():
-        # Get parsed JSON from form validation
-        parsed_json = form.cleaned_data.get("parsed_json")
+        # Parsed bundle (full scan bundle) is provided by the form
+        bundle = form.cleaned_data.get("parsed_json")
         user_notes = form.cleaned_data.get("user_notes", "")
 
-        # Parse hardware information
-        parsed = parse_lshw_json(parsed_json)
+        # Enforce the intake.asset_id matches the URL asset_tag to avoid mis-uploads
+        intake = bundle.get("intake", {}) or {}
+        bundle_asset_id = str(intake.get("asset_id", "") or "")
+        if bundle_asset_id != str(asset_tag):
+            messages.error(
+                request,
+                f"Bundle asset_id '{bundle_asset_id}' does not match this asset '{asset_tag}'. Upload rejected.",
+            )
+            return redirect("asset_detail", asset_tag=asset_tag)
+
+        # Compute canonical JSON form and sha256 for deduplication
+        try:
+            canonical = json.dumps(
+                bundle, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            )
+        except (TypeError, ValueError):
+            # Fallback: use normal dumps if some objects aren't serializable in canonical step
+            canonical = json.dumps(
+                bundle,
+                default=str,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+        bundle_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+        # Dedupe: if identical bundle already ingested for this asset, short-circuit
+        existing = HardwareScan.objects.filter(
+            asset=asset, bundle_hash=bundle_hash
+        ).first()
+        if existing:
+            messages.success(request, "Duplicate scan bundle (already exists).")
+            return redirect("asset_detail", asset_tag=asset_tag)
+
+        # Parse generated_at if present
+        gen_at_raw = bundle.get("generated_at")
+        generated_at = None
+        if gen_at_raw:
+            try:
+                generated_at = parse_datetime(gen_at_raw)
+            except Exception:
+                generated_at = None
+
+        # Extract intake duplicate fields for easier queries
+        tech_name = intake.get("tech_name", "") or ""
+        client_name = intake.get("client_name", "") or ""
+        cosmetic_condition = intake.get("cosmetic_condition", "") or ""
+        intake_note = intake.get("note", "") or ""
+
+        # Use the lshw source inside the bundle for existing parsing logic
+        sources = bundle.get("sources", {}) or {}
+        lshw_json = sources.get("lshw")  # expected to be a dict (LSHW JSON)
+
+        # Parse hardware information using existing parser (works on LSHW JSON)
+        parsed = {}
+        if lshw_json:
+            parsed = parse_lshw_json(lshw_json) or {}
         device_serial = parsed.get("device_serial")
         hw_summary = parsed.get("hw_summary")
-        disks = parsed.get("disks", [])
+        disks = parsed.get("disks", []) or []
 
-        # Create hardware scan record
+        # Create HardwareScan record (store full bundle in raw_json and metadata)
         scan = HardwareScan.objects.create(
             asset=asset,
             device_serial=device_serial,
-            raw_json=parsed_json,
+            raw_json=bundle,
+            bundle_hash=bundle_hash,
+            schema=bundle.get("schema", ""),
+            generated_at=generated_at,
+            tech_name=tech_name,
+            client_name=client_name,
+            cosmetic_condition=cosmetic_condition,
+            intake_note=intake_note,
             summary=hw_summary,
             scanned_by=request.user,
             user_notes=user_notes,
         )
 
-        # Create/update drive records
+        # Create/update drive records based on disks extracted from lshw parsing
+        created_or_updated = 0
         for disk in disks:
             serial = disk.get("serial")
             # Skip drives with missing/empty serials to prevent duplicates
             if not serial or not serial.strip():
                 continue
 
+            defaults = {
+                "logicalname": disk.get("logicalname", ""),
+                "capacity_bytes": disk.get("size_bytes"),
+                "model": disk.get("model", ""),
+                "source": "lshw",
+            }
+
             Drive.objects.update_or_create(
                 asset=asset,
                 serial=serial,
-                defaults={
-                    "logicalname": disk.get("logicalname", ""),
-                    "capacity_bytes": disk.get("size_bytes"),
-                    "model": disk.get("model", ""),
-                    "source": "lshw",
-                },
+                defaults=defaults,
             )
+            created_or_updated += 1
 
-        # Log the upload
+        # Log the upload (audit trail)
         _log_touch(
             asset,
             "scan_upload",
@@ -285,7 +356,7 @@ def asset_scan_upload(request, asset_tag):
 
         messages.success(
             request,
-            f"Hardware scan uploaded successfully! Found {len(disks)} drive(s).",
+            f"Saved scan bundle. Found {len(disks)} drive(s).",
         )
     else:
         for error in form.errors.values():

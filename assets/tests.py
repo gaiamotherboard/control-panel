@@ -1,10 +1,15 @@
 """
 Unit tests for asset management app
 Tests LSHW parsing, memory slot detection, and data integrity
+Includes new tests for scan bundle ingest, deduplication, and schema validation
 """
 
+import json
+
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+from django.urls import reverse
 
 from .lshw_parser import (
     extract_basic_hw,

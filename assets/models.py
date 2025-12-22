@@ -68,18 +68,39 @@ class Asset(models.Model):
 
 class HardwareScan(models.Model):
     """
-    Hardware scan record - stores lshw JSON output
-    Multiple scans per asset allowed (historical record)
+    Hardware scan record - stores scan bundle JSON output (motherboard.scan_bundle.v1)
+
+    We intentionally keep the existing model/table name to minimize code churn.
+    The `raw_json` field continues to store the uploaded payload (previously
+    it stored LSHW JSON; now it stores the full scan bundle). We add a
+    content hash for deduplication, generated_at from the bundle, the schema
+    string and duplicate intake fields to support easy querying in the future.
     """
 
     asset = models.ForeignKey(
         Asset, on_delete=models.CASCADE, related_name="hardware_scans"
     )
     device_serial = models.CharField(max_length=200, blank=True, null=True)
-    raw_json = models.JSONField()  # Full lshw output
-    summary = models.JSONField(
-        blank=True, null=True
-    )  # Extracted summary (CPU, RAM, etc.)
+
+    # Raw uploaded bundle (previously was full lshw output; now the whole bundle)
+    raw_json = models.JSONField()
+
+    # Deduplication hash (sha256 of canonical JSON form)
+    bundle_hash = models.CharField(max_length=64, db_index=True, blank=True, null=True)
+
+    # Bundle metadata
+    schema = models.CharField(max_length=200, blank=True, default="")
+    generated_at = models.DateTimeField(blank=True, null=True)
+
+    # Duplicate intake fields for easier querying/filtering
+    tech_name = models.CharField(max_length=200, blank=True, default="")
+    client_name = models.CharField(max_length=200, blank=True, default="")
+    cosmetic_condition = models.CharField(max_length=10, blank=True, default="")
+    intake_note = models.TextField(blank=True, default="")
+
+    # Extracted summary (CPU, RAM, etc.) - unchanged
+    summary = models.JSONField(blank=True, null=True)
+
     scanned_at = models.DateTimeField(auto_now_add=True)
     scanned_by = models.ForeignKey(User, on_delete=models.PROTECT)
     user_notes = models.TextField(blank=True, default="")
@@ -88,6 +109,17 @@ class HardwareScan(models.Model):
         ordering = ["-scanned_at"]
         verbose_name = "Hardware Scan"
         verbose_name_plural = "Hardware Scans"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["asset", "bundle_hash"], name="unique_asset_bundlehash"
+            )
+        ]
+        indexes = [
+            # helpful index to query scans by asset and generation time
+            models.Index(
+                fields=["asset", "generated_at"], name="asset_generated_at_idx"
+            ),
+        ]
 
     def __str__(self):
         return f"Scan of {self.asset.asset_tag} at {self.scanned_at}"

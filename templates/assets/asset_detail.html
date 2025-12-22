@@ -1,130 +1,108 @@
 <!--
-  Minimal safe asset detail template.
-  Intentionally omits <head> and <title> to avoid TemplateSyntaxError caused by corrupted tag insertion.
+Minimal, correct Django asset detail template.
+Shows: asset header, upload scan bundle form, latest scan metadata/status, drives, and activity.
+This file replaces the previous template and is intentionally small and stable.
 -->
 
-<div style="font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background:#f8fafc; color:#0f172a; min-height:100vh; padding:20px; box-sizing:border-box;">
+<div style="font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background:#f8fafc; color:#0f172a; min-height:100vh; padding:20px; box-sizing:border-box;">
   <div style="max-width:980px; margin:0 auto;">
 
     <!-- Top bar -->
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;">
-      <div></div>
-        <a href="{% url 'home' %}" style="color:#2563eb;text-decoration:none;font-weight:700;">← Home</a>
-      </div>
+      <a href="{% url 'home' %}" style="color:#2563eb;text-decoration:none;font-weight:700;">← Home</a>
       <div style="color:#64748b;font-size:0.95rem;">{{ request.user.username }}</div>
     </div>
 
     <!-- Asset header -->
     <div style="background:#ffffff;border:1px solid #e6edf3;border-radius:10px;padding:14px 16px;margin-bottom:14px;">
-      <div style="font-size:1.4rem;font-weight:800;line-height:1.2;">
-        Asset <span style="color:#1d4ed8;">{{ asset.asset_tag }}</span>
-      </div>
-      <div style="margin-top:6px;color:#64748b;font-size:0.95rem;">
-        Created {{ asset.created_at|date:"Y-m-d H:i" }} by {{ asset.created_by.username }}
-      </div>
+      <div style="font-size:1.4rem;font-weight:800;">Asset <span style="color:#1d4ed8;">{{ asset.asset_tag }}</span></div>
+      <div style="margin-top:6px;color:#64748b;font-size:0.95rem;">Created {{ asset.created_at|date:"Y-m-d H:i" }} by {{ asset.created_by.username }}</div>
     </div>
 
     <!-- Flash messages -->
     {% if messages %}
       <div style="margin-bottom:14px;">
         {% for message in messages %}
-          <div style="background:#ffffff;border:1px solid #e6edf3;border-radius:10px;padding:10px 12px;margin-bottom:8px;color:#475569;">
+          <div style="background:#fff;border:1px solid #e6edf3;border-radius:10px;padding:10px 12px;margin-bottom:8px;color:#475569;">
             {{ message }}
           </div>
         {% endfor %}
       </div>
     {% endif %}
 
-    <!-- Hardware summary -->
-    {% if latest_scan %}
-      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
-        <div style="flex:1 1 220px;min-width:220px;background:#ffffff;border:1px solid #e6edf3;border-radius:10px;padding:12px;">
-          <div style="color:#64748b;font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">CPU</div>
-          <div style="margin-top:6px;font-weight:700;">{{ cpu_info|default:"Not detected" }}</div>
-        </div>
-
-        <div style="flex:1 1 220px;min-width:220px;background:#ffffff;border:1px solid #e6edf3;border-radius:10px;padding:12px;">
-          <div style="color:#64748b;font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">RAM</div>
-          <div style="margin-top:6px;font-weight:800;">
-            {% if memory_total_human %}
-              {{ memory_total_human }}
-            {% else %}
-              {{ hw_summary.ram|default:"Not detected" }}
-            {% endif %}
-          </div>
-        </div>
-
-        <div style="flex:1 1 220px;min-width:220px;background:#ffffff;border:1px solid #e6edf3;border-radius:10px;padding:12px;">
-          <div style="color:#64748b;font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Storage</div>
-          <div style="margin-top:6px;font-weight:700;">{{ hw_summary.storage|default:"Not detected" }}</div>
-        </div>
-
-        <div style="flex:1 1 220px;min-width:220px;background:#ffffff;border:1px solid #e6edf3;border-radius:10px;padding:12px;">
-          <div style="color:#64748b;font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Device Serial</div>
-          <div style="margin-top:6px;font-weight:700;">{{ latest_scan.device_serial|default:"Not detected" }}</div>
-        </div>
-      </div>
-
-      <!-- Memory slots -->
-      <div style="background:#ffffff;border:1px solid #e6edf3;border-radius:10px;padding:12px;margin-bottom:12px;">
-        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-end;flex-wrap:wrap;">
-          <div style="font-weight:800;">Memory</div>
-          <div style="color:#64748b;font-size:0.95rem;">
-            Total: {{ memory_total_human|default:"Unknown" }}
-          </div>
-        </div>
-
-        {% if memory_slots %}
-          <div style="margin-top:10px;">
-            {% for slot in memory_slots %}
-              <div style="border:1px solid #eef2ff;border-radius:8px;padding:10px;margin-bottom:8px;background:#fbfdff;">
-                <div style="font-weight:800;">
-                  {% if slot.slot %}{{ slot.slot }}{% else %}Slot {{ forloop.counter }}{% endif %}
-                </div>
-                <div style="color:#475569;font-size:0.95rem;margin-top:4px;">
-                  Size: {{ slot.size_human|default:"Unknown" }}
-                </div>
-                <div style="color:#475569;font-size:0.95rem;margin-top:2px;">
-                  Vendor: {{ slot.vendor|default:"Unknown" }}
-                </div>
-                <div style="color:#475569;font-size:0.95rem;margin-top:2px;">
-                  Part/Product: {{ slot.product|default:"Unknown" }}
-                </div>
-                {% if slot.serial %}
-                  <div style="color:#475569;font-size:0.95rem;margin-top:2px;">
-                    Serial: {{ slot.serial }}
-                  </div>
-                {% endif %}
-              </div>
-            {% endfor %}
-          </div>
-        {% else %}
-          <div style="margin-top:10px;color:#64748b;">No per-slot memory information available.</div>
-        {% endif %}
-      </div>
-    {% endif %}
-
-    <!-- Upload scan -->
-    <div style="background:#ffffff;border:1px solid #e6edf3;border-radius:10px;padding:12px;margin-bottom:12px;">
-      <div style="font-weight:800;margin-bottom:8px;">Upload LSHW JSON</div>
+    <!-- Upload scan bundle -->
+    <div style="background:#fff;border:1px solid #e6edf3;border-radius:10px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:800;margin-bottom:8px;">Upload Scan Bundle JSON</div>
       <form method="post" action="{% url 'asset_scan_upload' asset.asset_tag %}" enctype="multipart/form-data">
         {% csrf_token %}
         <div style="margin-bottom:10px;">
-          <div style="font-weight:700;margin-bottom:6px;">LSHW JSON file</div>
+          <label style="font-weight:700;display:block;margin-bottom:6px;">Scan bundle JSON file (motherboard.scan_bundle.v1)</label>
           {{ upload_form.file }}
         </div>
         <div style="margin-bottom:10px;">
-          <div style="font-weight:700;margin-bottom:6px;">Notes (optional)</div>
+          <label style="font-weight:700;display:block;margin-bottom:6px;">Notes (optional)</label>
           {{ upload_form.user_notes }}
         </div>
-        <button type="submit" style="background:#16a34a;color:#ffffff;border:none;border-radius:8px;padding:10px 12px;font-weight:800;cursor:pointer;">
-          Upload
-        </button>
+        <button type="submit" style="background:#16a34a;color:#fff;border:none;padding:10px 12px;border-radius:8px;font-weight:800;cursor:pointer;">Upload</button>
       </form>
     </div>
 
+    <!-- Latest scan bundle -->
+    {% if latest_scan %}
+      <div style="background:#fff;border:1px solid #e6edf3;border-radius:10px;padding:12px;margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-weight:800;">Latest Scan Bundle</div>
+          <div style="color:#64748b;">Saved {{ latest_scan.scanned_at|date:"Y-m-d H:i" }}</div>
+        </div>
+
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;">
+          <div style="flex:1 1 220px;min-width:220px;">
+            <div style="font-weight:700;color:#64748b;">Generated At</div>
+            <div style="margin-top:6px;">{% if latest_scan.generated_at %}{{ latest_scan.generated_at|date:"Y-m-d H:i" }}{% else %}{{ latest_scan.raw_json.generated_at|default:"Unknown" }}{% endif %}</div>
+          </div>
+
+          <div style="flex:1 1 220px;min-width:220px;">
+            <div style="font-weight:700;color:#64748b;">Scanner</div>
+            <div style="margin-top:6px;">{% if latest_scan.raw_json.scanner %}{{ latest_scan.raw_json.scanner.hostname|default:"" }} / {{ latest_scan.raw_json.scanner.user|default:"" }}{% else %}N/A{% endif %}</div>
+          </div>
+
+          <div style="flex:1 1 220px;min-width:220px;">
+            <div style="font-weight:700;color:#64748b;">Intake</div>
+            <div style="margin-top:6px;">Tech: {% if latest_scan.tech_name %}{{ latest_scan.tech_name }}{% else %}{{ latest_scan.raw_json.intake.tech_name|default:"" }}{% endif %}</div>
+            <div style="color:#64748b;margin-top:4px;">Client: {% if latest_scan.client_name %}{{ latest_scan.client_name }}{% else %}{{ latest_scan.raw_json.intake.client_name|default:"" }}{% endif %}</div>
+            <div style="color:#64748b;margin-top:4px;">Condition: {% if latest_scan.cosmetic_condition %}{{ latest_scan.cosmetic_condition }}{% else %}{{ latest_scan.raw_json.intake.cosmetic_condition|default:"" }}{% endif %}</div>
+          </div>
+        </div>
+
+        <div style="margin-top:8px;">
+          <div style="font-weight:800;margin-bottom:6px;">Source Status</div>
+          <div style="overflow:auto;">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead></thead>
+                <tr style="text-align:left;border-bottom:1px solid #e6edf3;">
+                  <th style="padding:6px 8px;">Source</th>
+                  <th style="padding:6px 8px;">RC</th>
+                  <th style="padding:6px 8px;">Stderr (truncated)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+                {% for src, st in latest_scan.raw_json.meta.status.items %}
+                  <tr style="border-bottom:1px solid #f1f5f9;">
+                    <td style="padding:6px 8px;font-weight:700;">{{ src }}</td>
+                    <td style="padding:6px 8px;">{{ st.rc }}</td>
+                    <td style="padding:6px 8px;color:#475569;max-width:60ch;"><pre style="white-space:pre-wrap;margin:0;padding:0;">{{ st.stderr|default:""|slice:":200" }}</pre></td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
     <!-- Drives -->
-    <div style="background:#ffffff;border:1px solid #e6edf3;border-radius:10px;padding:12px;margin-bottom:12px;">
+    <div style="background:#fff;border:1px solid #e6edf3;border-radius:10px;padding:12px;margin-bottom:12px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;">
         <div style="font-weight:800;">Drives ({{ display_drives|length }})</div>
         <div style="color:#64748b;font-size:0.95rem;">(Boot media excluded)</div>
@@ -132,84 +110,35 @@
 
       {% if hard_drive_present %}
         <div style="margin-top:10px;background:#fff7f7;border:1px solid #fecaca;color:#991b1b;padding:10px;border-radius:8px;">
-          <strong>Warning:</strong</strong>> First-class hard drive detected. Presume it contains data until processed.
+          <strong>Warning</strong>:</strong> First-class hard drive detected. Presume it contains data until processed.
         </div>
       {% endif %}
 
       {% if display_drives %}
         <div style="margin-top:10px;">
           {% for drive in display_drives %}
-            <div style="border:1px solid #f1f5f9;border-radius:10px;padding:12px;margin-bottom:10px;background:#ffffff;">
+            <div style="border:1px solid #f1f5f9;border-radius:8px;padding:12px;margin-bottom:8px;background:#fff;">
               <div style="font-weight:900;">{{ drive.model|default:"Unknown Model" }}</div>
-              <div style="color:#64748b;margin-top:4px;">
-                {% if drive.capacity_human %}{{ drive.capacity_human }}{% endif %}
-                {% if drive.logicalname %} — {{ drive.logicalname }}{% endif %}
-              </div>
-              <div style="color:#64748b;margin-top:2px;">Serial: {{ drive.serial }}</div>
-              <div style="color:#64748b;margin-top:2px;">Status: {{ drive.get_status_display }}</div>
-
-              <!-- Quick actions -->
-              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">
-                <form method="post" action="{% url 'drive_status_update' asset.asset_tag drive.id %}">
-                  {% csrf_token %}
-                  <input type="hidden" name="status" value="removed">
-                  <input type="hidden" name="status_note" value="Marked removed via quick action">
-                  <button type="submit" style="background:#fb7185;color:#7f1d1d;border:none;border-radius:8px;padding:8px 10px;font-weight:800;cursor:pointer;">
-                    Hard drive removed
-                  </button>
-                </form>
-
-                <form method="post" action="{% url 'drive_status_update' asset.asset_tag drive.id %}">
-                  {% csrf_token %}
-                  <input type="hidden" name="status" value="wiped">
-                  <input type="hidden" name="status_note" value="Marked wiped via quick action">
-                  <button type="submit" style="background:#fde68a;color:#92400e;border:none;border-radius:8px;padding:8px 10px;font-weight:800;cursor:pointer;">
-                    Hard drive wipe
-                  </button>
-                </form>
-              </div>
-
-              <!-- Full status form -->
-              <details style="margin-top:10px;">
-                <summary style="cursor:pointer;color:#2563eb;font-weight:700;">Update status / notes</summary>
-                <form method="post" action="{% url 'drive_status_update' asset.asset_tag drive.id %}" style="margin-top:10px;">
-                  {% csrf_token %}
-                  <div style="margin-bottom:8px;">
-                    <div style="font-weight:700;margin-bottom:6px;">Status</div>
-                    <select name="status">
-                      <option value="present" {% if drive.status == 'present' %}selected{% endif %}>Present</option>
-                      <option value="removed" {% if drive.status == 'removed' %}selected{% endif %}>Removed</option>
-                      <option value="wiped" {% if drive.status == 'wiped' %}selected{% endif %}>Wiped</option>
-                      <option value="shredded" {% if drive.status == 'shredded' %}selected{% endif %}>Shredded</option>
-                      <option value="returned_to_client" {% if drive.status == 'returned_to_client' %}selected{% endif %}>Returned to Client</option>
-                    </select>
-                  </div>
-                  <div style="margin-bottom:8px;">
-                    <div style="font-weight:700;margin-bottom:6px;">Note (optional)</div>
-                    <textarea name="status_note" rows="2">{{ drive.status_note }}</textarea>
-                  </div>
-                  <button type="submit" style="background:#2563eb;color:#ffffff;border:none;border-radius:8px;padding:8px 10px;font-weight:800;cursor:pointer;">
-                    Save
-                  </button>
-                </form>
-              </details>
+              <div style="color:#64748b;margin-top:6px;">{% if drive.capacity_human %}{{ drive.capacity_human }}{% endif %}{% if drive.logicalname %} — {{ drive.logicalname }}{% endif %}</div>
+              <div style="color:#64748b;margin-top:4px;">Serial: {{ drive.serial }}</div>
+              <div style="color:#64748b;margin-top:4px;">Status: {{ drive.get_status_display }}</div>
             </div>
           {% endfor %}
         </div>
       {% else %}
-        <div style="margin-top:10px;color:#64748b;">No drives detected.</div>
+        <div style="color:#64748b;">No drives detected.</div>
       {% endif %}
     </div>
 
     <!-- Activity -->
-    <div style="background:#ffffff;border:1px solid #e6edf3;border-radius:10px;padding:12px;">
+    <div style="background:#fff;border:1px solid #e6edf3;border-radius:10px;padding:12px;">
       <div style="font-weight:800;margin-bottom:8px;">Activity</div>
       {% if touches %}
         <ul style="list-style:none;padding:0;margin:0;">
           {% for t in touches %}
-            <li style="padding:8px;border:1px solid #f1f5f9;border-radius:10px;margin-bottom:8px;color:#475569;">
+            <li style="padding:8px;border:1px solid #f1f5f9;border-radius:8px;margin-bottom:8px;">
               <div style="font-weight:700;">{{ t.get_touch_type_display }}</div>
-              <div style="color:#64748b;font-size:0.92rem;">{{ t.touched_at|date:"Y-m-d H:i" }} — {{ t.touched_by.username }}</div>
+              <div style="color:#64748b;">{{ t.touched_at|date:"Y-m-d H:i" }} — {{ t.touched_by.username }}</div>
             </li>
           {% endfor %}
         </ul>
